@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Планировщик натяжного потолка</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#1d2733;--mut:#6b7785;--line:#d5dbe2;--acc:#0d6e6e}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.4 "Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.app{display:flex;gap:16px;padding:16px;align-items:flex-start}
+aside{width:370px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+main{flex:1;min-width:0;position:sticky;top:16px}
+h1{font-size:18px;margin:0 0 6px}
+h2{font-size:14px;margin:16px 0 6px;color:var(--mut);font-weight:600;border-top:1px solid var(--line);padding-top:12px}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
+input,select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font:inherit;background:#fff;color:var(--ink)}
+textarea{font:13px/1.3 Consolas,monospace;height:96px;resize:vertical}
+input[type=checkbox]{width:auto}
+.ck{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--ink);margin-top:8px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+button{font:inherit;padding:7px 10px;border:1px solid var(--line);background:#fff;border-radius:5px;cursor:pointer;color:var(--ink)}
+button:hover{border-color:var(--acc)}
+.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.card{border:1px solid var(--line);border-radius:6px;margin-top:6px}
+.card.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.hd{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer}
+.hd b{flex:1;font-weight:500}
+.n{width:22px;height:22px;border-radius:50%;background:#1a56db;color:#fff;font-size:12px;display:grid;place-items:center;flex:none}
+.hd button{padding:1px 7px;font-size:13px}
+.fields{padding:0 8px 8px}
+.wrap{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px}
+canvas{width:100%;height:auto;display:block;touch-action:none;cursor:grab}
+.hint{color:var(--mut);font-size:13px;margin:8px 2px}
+[hidden]{display:none!important}
+summary{font-size:14px;font-weight:600;color:var(--mut);cursor:pointer;border-top:1px solid var(--line);padding:12px 0 6px;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}th{color:var(--mut);font-weight:600;font-size:12px}td input{padding:3px 6px}
+.home{max-width:860px;margin:0 auto;padding:20px 16px}.hbar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.pc{display:flex;justify-content:space-between;gap:12px;padding:12px;background:#fff;align-items:center}.pb{display:flex;gap:6px;flex-wrap:wrap}
+.mut{color:var(--mut);font-size:13px}.tag{background:#e2f1f1;color:var(--acc);border-radius:10px;padding:0 8px;font-size:12px}
+.specwrap{margin:0 16px 24px;overflow-x:auto}
+@media(max-width:900px){.app{flex-direction:column}aside{width:100%}main{position:static;width:100%}.pc{flex-direction:column;align-items:stretch}}
+</style>
+</head>
+<body>
+<div id="home" class="home">
+  <h1>Проекты натяжных потолков</h1>
+  <div class="hbar"><button class="pri" id="pnew">+ Новый проект</button><button id="pld">Открыть файл…</button><button id="pbk">Резервная копия всех проектов</button></div>
+  <div id="plist"></div>
+  <details><summary>Настройки: распознавание по фото</summary>
+    <label for="pk">API-ключ Anthropic (хранится только в этом браузере)</label>
+    <input id="pk" type="password" autocomplete="off" placeholder="sk-ant-...">
+    <p class="hint">Ключ создаётся на console.anthropic.com, оплата там отдельная от подписки Claude. Вводите ключ только вручную и не вписывайте его в код страницы.</p>
+  </details>
+</div>
+<div id="proj" hidden>
+<div class="app">
+<aside>
+  <button id="back">← Все проекты</button>
+  <div style="margin-top:10px"><label for="pn">Название проекта</label><input id="pn"></div>
+  <div class="row"><div><label for="dm">Дата замера</label><input type="date" id="dm"></div><div><label for="di">Дата монтажа</label><input type="date" id="di"></div></div>
+  <div class="row"><div><label for="t1">Монтаж с</label><input type="time" id="t1"></div><div><label for="t2">до</label><input type="time" id="t2"></div></div>
+  <div style="margin-top:8px"><label for="st">Статус</label><select id="st"><option>Замер</option><option>Предложение</option><option>Согласован</option><option>Монтаж</option><option>Готово</option></select></div>
+  <button class="pri" id="ph" style="width:100%;margin-top:10px">Заполнить по фото</button>
+  <p class="hint" id="phs">Загрузите фото чертежа или эскиза замера: комнаты, размеры и элементы заполнятся сами.</p>
+  <input type="file" id="pf" accept="image/*" hidden>
+  <details><summary>Заказчик</summary>
+  <label for="cn">Имя</label><input id="cn" data-c="n" autocomplete="off">
+  <div class="row"><div><label for="cp">Телефон</label><input id="cp" data-c="p" type="tel"></div><div><label for="ce">E-mail</label><input id="ce" data-c="e" type="email"></div></div>
+  <div style="margin-top:8px"><label for="ca">Адрес объекта</label><input id="ca" data-c="a"></div>
+
+  </details><h2>Комнаты</h2>
+  <div class="tabs" id="tabs"></div>
+  <div class="row"><div><label for="rn">Название комнаты</label><input id="rn"></div><div style="align-self:end"><button id="rdel" style="width:100%">Удалить комнату</button></div></div>
+  <div class="row"><div><label for="mb">Бренд полотна</label><select id="mb"><option value="">не указан</option><option>MSD</option><option>Bauf</option><option>Tectum</option></select></div>
+  <div><label for="mt">Фактура</label><select id="mt"><option value="">не указана</option><option>матовая</option><option>сатиновая</option><option>глянцевая</option></select></div></div>
+  <div style="margin-top:8px"><label for="mc">Цвет полотна</label><input id="mc" placeholder="например: белый"></div>
+  <div style="margin-top:8px"><label for="mh">Тип гарпуна</label><select id="mh"><option value="">не указан</option><option value="black">Черный теневой гарпун</option><option value="white">Белый гарпун под ленту</option></select></div>
+  <div style="margin-top:8px"><label for="rnote">Заметка по комнате (печатается внизу листа)</label><textarea id="rnote" style="height:60px"></textarea></div>
+
+  <details><summary>Форма комнаты</summary>
+  <div class="row">
+    <div><label for="sh">Форма</label><select id="sh"><option value="R">Прямоугольник</option><option value="L">Г-образная</option><option value="U">П-образная</option><option value="T">Т-образная</option></select></div>
+    <div><label for="co">Угол выреза (Г-образная)</label><select id="co"><option value="br">снизу справа</option><option value="bl">снизу слева</option><option value="tr">сверху справа</option><option value="tl">сверху слева</option></select></div>
+    <div><label for="sW">Ширина, см</label><input id="sW" type="number" value="400"></div>
+    <div><label for="sL">Длина, см</label><input id="sL" type="number" value="500"></div>
+    <div><label for="sC">Вырез: ширина, см</label><input id="sC" type="number" value="150"></div>
+    <div><label for="sH">Вырез: глубина, см</label><input id="sH" type="number" value="200"></div>
+  </div>
+  <button id="ap" style="width:100%;margin-top:8px">Применить форму</button>
+  <label for="pts" style="margin-top:8px">Углы по порядку обхода (x, y в см), по одному на строку. Любой многоугольник.</label>
+  <textarea id="pts" spellcheck="false"></textarea>
+
+  </details><details><summary>Подсветка по периметру</summary>
+  <label class="ck"><input type="checkbox" id="pe"> Светящаяся кромка вдоль всех стен</label>
+  <div class="row"><div><label for="pw">Ширина свечения, см</label><input id="pw" type="number" value="4" min="1"></div>
+  <div><label for="pc">Цвет света</label><select id="pc"><option value="#ffc94d">Тёплый</option><option value="#fff3c4">Нейтральный</option><option value="#bfe3ff">Холодный</option></select></div></div>
+
+  </details><h2>Добавить в комнату</h2>
+  <div class="row" style="margin-top:0">
+    <button data-add="spot">+ Точечный светильник</button><button data-add="track">+ Трековый светильник</button>
+    <button data-add="lamp">+ Люстра</button><button data-add="cornice">+ Карниз</button><button data-add="vent">+ Вентиляция</button><button data-add="pipe">+ Обход трубы</button>
+  </div>
+  <div id="list"></div>
+
+  <h2>Результат</h2>
+  <div class="row" style="margin-top:0"><button class="pri" id="jpg">JPEG этой комнаты</button><button class="pri" id="pdf">PDF с итоговым списком</button></div>
+  <details><summary>Ещё</summary><div class="row"><button id="grid">Сетка вкл/выкл</button><button id="dem">Пример</button>
+  <button id="sv">Сохранить проект в файл</button><button id="ld">Открыть файл проекта</button></div></details>
+  <input type="file" id="fl" accept=".json" hidden>
+</aside>
+<main>
+  <div class="wrap"><canvas id="cv"></canvas></div>
+  <p class="hint">Перетаскивайте светильники, карнизы и белые квадратики в углах комнаты. У выбранного элемента показаны расстояния до левой и верхней границы. Размеры в сантиметрах.</p>
+</main>
+</div>
+<div class="wrap specwrap"><h2 style="border:0;margin:0 0 8px;padding:0">Список оборудования и работ</h2><div id="spec"></div><label for="pnote" style="margin-top:10px">Заметка к проекту (печатается внизу списка)</label><textarea id="pnote" style="height:70px"></textarea><button class="pri" id="xl" style="margin-top:10px">Скачать Excel</button></div>
+</div>
+<script>
+const $=s=>$d.querySelector(s),$d=document,esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const r0=Math.round,NAMES={spot:'Точечный светильник',track:'Трековый светильник',lamp:'Люстра',cornice:'Карниз',vent:'Вентиляция',pipe:'Обход трубы'};
+const rect=(W,L)=>[[0,0],[W,0],[W,L],[0,L]];
+function shape(t,W,L,cw,ch,cor){
+  let p=rect(W,L),a=(W-cw)/2;
+  if(t==='L'){p=[[0,0],[W,0],[W,L-ch],[W-cw,L-ch],[W-cw,L],[0,L]];
+    if(cor==='tr'||cor==='tl')p=p.map(([x,y])=>[x,L-y]);if(cor==='bl'||cor==='tl')p=p.map(([x,y])=>[W-x,y])}
+  if(t==='U')p=[[0,0],[a,0],[a,ch],[a+cw,ch],[a+cw,0],[W,0],[W,L],[0,L]];
+  if(t==='T')p=[[0,0],[W,0],[W,ch],[a+cw,ch],[a+cw,L],[a,L],[a,ch],[0,ch]];
+  return p.map(([x,y])=>[r0(x),r0(y)]);
+}
+const mkRoom=n=>({id:Date.now()+Math.random(),name:n,pts:rect(400,500),perim:{on:false,w:4,col:'#ffc94d'},mat:{brand:'',tex:'',color:'',harpoon:''},note:'',items:[]});
+const today=()=>new Date().toISOString().slice(0,10);
+const mkProj=()=>({id:Date.now()+Math.random(),name:'Новый проект',status:'Замер',dm:today(),di:'',t1:'',t2:'',note:'',client:{n:'',p:'',e:'',a:''},rooms:[mkRoom('Комната 1')],cur:0,grid:true,sel:null,extras:[]});
+let DB={projects:[],prices:{},key:''},P=mkProj();
+try{const j=JSON.parse(localStorage.getItem('ceilingDB')||'null');
+  if(j&&j.projects)DB=Object.assign(DB,j);
+  else{const o=JSON.parse(localStorage.getItem('ceilingPlan2')||'null');if(o&&o.rooms)DB.projects.push(Object.assign(mkProj(),o,{name:(o.client&&o.client.n)||'Мой проект'}))}
+}catch(e){}
+const persist=()=>{try{localStorage.setItem('ceilingDB',JSON.stringify(DB))}catch(e){}};
+const save=()=>{persist();if(!$('#proj').hidden)specUI()};
+const R=()=>P.rooms[P.cur];
+
+// ---------- геометрия ----------
+const bbox=pts=>({x0:Math.min(...pts.map(p=>p[0])),y0:Math.min(...pts.map(p=>p[1])),x1:Math.max(...pts.map(p=>p[0])),y1:Math.max(...pts.map(p=>p[1]))});
+function pip(pts,x,y){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const[a,b]=pts[i],[d,e]=pts[j];if((b>y)!==(e>y)&&x<(d-a)*(y-b)/(e-b)+a)c=!c}return c}
+const area=pts=>Math.abs(pts.reduce((s,p,i)=>{const q=pts[(i+1)%pts.length];return s+p[0]*q[1]-q[0]*p[1]},0))/2;
+function wall(r,i){ // стена i: начало, направление, внутренняя нормаль, длина
+  const n=r.pts.length,a=r.pts[((i%n)+n)%n],b=r.pts[(((i%n)+n)%n+1)%n],dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1,d=[dx/l,dy/l];
+  let nm=[-d[1],d[0]];const m=[(a[0]+b[0])/2+nm[0]*2,(a[1]+b[1])/2+nm[1]*2];
+  if(!pip(r.pts,m[0],m[1]))nm=[-nm[0],-nm[1]];
+  return{a,d,n:nm,l};
+}
+const cp=(w,u,v)=>[w.a[0]+w.d[0]*u+w.n[0]*v,w.a[1]+w.d[1]*u+w.n[1]*v];
+function desc(r,it){
+  if(it.type==='spot')return `Точечный светильник Ø${it.d} см${it.w?', '+it.w+' Вт':''}${it.k?', '+it.k+' K':''}: x ${it.x}, y ${it.y} см`;
+  if(it.type==='pipe')return `Обход трубы Ø${it.d} см: x ${it.x}, y ${it.y} см`;
+  if(it.type==='vent')return `Вентиляционная решётка ${it.d} см: x ${it.x}, y ${it.y} см`;
+  if(it.type==='lamp')return `Люстра Ø${it.d} см: центр x ${it.x}, y ${it.y} см`;
+  if(it.type==='track')return `Трековый светильник ${it.len} см${it.w?', '+it.w+' Вт':''}${it.k?', '+it.k+' K':''}, ${+it.rot?'вертикально':'горизонтально'}: центр x ${it.x}, y ${it.y} см`;
+  return `${it.old?'Существующий карниз (перевесить ниже)':'Карниз'} ${it.len} см у стены ${it.wall+1} (${r0(wall(r,it.wall).l)} см), отступ ${it.off} см, глубина ${it.depth} см${it.light?', с подсветкой':''}`;
+}
+
+// ---------- интерфейс ----------
+function add(type){
+  const r=R(),b=bbox(r.pts),it={id:Date.now()+Math.random(),type,x:r0((b.x0+b.x1)/2),y:r0((b.y0+b.y1)/2)};
+  if(type==='spot'){it.d=8;it.w=6;it.k=4000}
+  if(type==='lamp')it.d=60;
+  if(type==='vent')it.d=10;
+  if(type==='pipe')it.d=5;
+  if(type==='track'){it.len=150;it.rot=0;it.w=12;it.k=4000}
+  if(type==='cornice'){it.wall=0;it.off=0;it.len=r0(Math.min(200,wall(r,0).l));it.depth=12;it.light=true;it.old=false}
+  r.items.push(it);P.sel=it.id;list();draw();save();
+}
+const FIELDS={
+  spot:[['x','Центр X, см'],['y','Центр Y, см'],['d','Диаметр, см'],['w','Мощность, Вт'],['k','Температура, K']],
+  lamp:[['x','Центр X, см'],['y','Центр Y, см'],['d','Диаметр, см']],
+  vent:[['x','Центр X, см'],['y','Центр Y, см'],['d','Размер стороны, см']],
+  pipe:[['x','Центр X, см'],['y','Центр Y, см'],['d','Диаметр трубы, см']],
+  track:[['x','Центр X, см'],['y','Центр Y, см'],['len','Длина, см'],['rot','Направление'],['w','Мощность, Вт'],['k','Температура, K']],
+  cornice:[['wall','Стена'],['off','Отступ от угла стены, см'],['len','Длина, см'],['depth','Глубина, см']]
+};
+function list(){
+  const r=R(),el=$('#list');
+  if(!r.items.length){el.innerHTML='<p class="hint">В комнате пока ничего нет. Добавьте светильник или карниз.</p>';return}
+  el.innerHTML=r.items.map((it,i)=>{
+    const sel=it.id===P.sel;let f='';
+    if(sel){
+      f='<div class="fields"><div class="row">'+FIELDS[it.type].map(([k,t])=>{
+        let inp;
+        if(k==='wall')inp=`<select data-k="wall">${r.pts.map((_,w)=>`<option value="${w}" ${it.wall===w?'selected':''}>Стена ${w+1} (${r0(wall(r,w).l)} см)</option>`).join('')}</select>`;
+        else if(k==='rot')inp=`<select data-k="rot"><option value="0" ${+it.rot?'':'selected'}>Горизонтально</option><option value="90" ${+it.rot?'selected':''}>Вертикально</option></select>`;
+        else inp=`<input type="number" data-k="${k}" value="${it[k]}">`;
+        return `<div><label>${t}</label>${inp}</div>`}).join('')+'</div>'+
+        (it.type==='cornice'?`<label class="ck"><input type="checkbox" data-k="light" ${it.light?'checked':''}> Подсветка в карнизе</label><label class="ck"><input type="checkbox" data-k="old" ${it.old?'checked':''}> Существующий карниз, перевесить ниже</label>`:'')+'</div>';
+    }
+    return `<div class="card ${sel?'sel':''}"><div class="hd" data-sel="${it.id}"><span class="n">${i+1}</span><b>${NAMES[it.type]}</b><button data-dup="${it.id}" title="Копия">⧉</button><button data-del="${it.id}" title="Удалить">✕</button></div>${f}</div>`;
+  }).join('');
+}
+function tabs(){
+  $('#tabs').innerHTML=P.rooms.map((r,i)=>`<button data-room="${i}" class="${i===P.cur?'pri':''}">${esc(r.name||'Комната')}</button>`).join('')+'<button id="radd">+ комната</button>';
+}
+function sync(){ // подставить данные текущей комнаты в форму
+  const r=R();tabs();list();
+  $('#rn').value=r.name;$('#pts').value=r.pts.map(p=>p.join(', ')).join('\n');
+  $('#pe').checked=r.perim.on;$('#pw').value=r.perim.w;$('#pc').value=r.perim.col;
+  const m=r.mat||{};$('#mb').value=m.brand||'';$('#mt').value=m.tex||'';$('#mc').value=m.color||'';$('#mh').value=m.harpoon||'';$('#rnote').value=r.note||'';
+}
+$('#tabs').onclick=e=>{
+  if(e.target.id==='radd'){{const n=mkRoom('Комната '+(P.rooms.length+1));n.mat=Object.assign({},R().mat);P.rooms.push(n)}P.cur=P.rooms.length-1}
+  else if(e.target.dataset.room!==undefined)P.cur=+e.target.dataset.room;else return;
+  P.sel=null;sync();draw();save();
+};
+$('#rn').oninput=e=>{R().name=e.target.value;tabs();draw();save()};
+$('#rdel').onclick=()=>{
+  if(P.rooms.length<2){alert('В проекте должна остаться хотя бы одна комната.');return}
+  if(confirm('Удалить комнату «'+R().name+'»?')){P.rooms.splice(P.cur,1);P.cur=Math.max(0,P.cur-1);P.sel=null;sync();draw();save()}
+};
+document.querySelectorAll('[data-c]').forEach(i=>{i.value=P.client[i.dataset.c]||'';i.oninput=()=>{P.client[i.dataset.c]=i.value;draw();save()}});
+$('#ap').onclick=()=>{
+  const v=id=>Math.max(10,parseFloat($(id).value)||10),W=v('#sW'),L=v('#sL');
+  let cw=Math.min(v('#sC'),W-10),ch=Math.min(v('#sH'),L-10);
+  R().pts=shape($('#sh').value,W,L,cw,ch,$('#co').value);sync();draw();save();
+};
+$('#pts').oninput=e=>{
+  const p=e.target.value.split('\n').map(l=>l.split(/[,;\s]+/).filter(Boolean).map(Number)).filter(a=>a.length===2&&a.every(isFinite));
+  if(p.length>=3){R().pts=p;list();draw();save()}
+};
+['pe','pw','pc'].forEach(id=>$('#'+id).oninput=()=>{const q=R().perim;q.on=$('#pe').checked;q.w=Math.max(1,parseFloat($('#pw').value)||4);q.col=$('#pc').value;draw();save()});
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>add(b.dataset.add));
+$('#list').addEventListener('click',e=>{
+  const r=R(),d=e.target.closest('[data-del]'),u=e.target.closest('[data-dup]'),s=e.target.closest('[data-sel]');
+  if(d){r.items=r.items.filter(i=>i.id!=d.dataset.del);if(P.sel==d.dataset.del)P.sel=null}
+  else if(u){const o=r.items.find(i=>i.id==u.dataset.dup),c=Object.assign({},o,{id:Date.now()+Math.random()});
+    if(c.type==='cornice')c.off=Math.max(0,c.off+20);else{c.x+=20;c.y+=20}r.items.push(c);P.sel=c.id}
+  else if(s)P.sel=r.items.find(i=>i.id==s.dataset.sel).id;else return;
+  list();draw();save();
+});
+$('#list').addEventListener('input',e=>{
+  const k=e.target.dataset.k,r=R(),it=r.items.find(i=>i.id===P.sel);if(!k||!it)return;
+  it[k]=e.target.type==='checkbox'?e.target.checked:(k==='wall'||k==='rot')?+e.target.value:(parseFloat(e.target.value)||0);
+  if(k==='wall'){it.off=0;it.len=r0(Math.min(it.len,wall(r,it.wall).l));list()}
+  draw();save();
+});
+$('#grid').onclick=()=>{P.grid=!P.grid;draw();save()};
+$('#dem').onclick=()=>{
+  if(!confirm('Заменить текущий проект примером?'))return;
+  const r=mkRoom('Гостиная');r.pts=shape('L',600,450,220,180,'br');r.perim={on:true,w:4,col:'#ffc94d'};
+  const it=(type,o)=>r.items.push(Object.assign({id:Date.now()+Math.random(),type},o));
+  it('cornice',{wall:0,off:20,len:300,depth:12,light:true,x:0,y:0});
+  it('lamp',{x:200,y:220,d:60});it('track',{x:420,y:110,len:200,rot:0});
+  [[100,120],[100,330],[300,330],[500,250]].forEach(([x,y])=>it('spot',{x,y,d:8}));
+  const k=mkRoom('Спальня');k.pts=rect(350,400);k.items.push({id:1,type:'lamp',x:175,y:200,d:50});
+  P.client={n:'Иван Петров',p:'+372 5555 5555',e:'ivan@example.com',a:'Таллин, ул. Пример 1'};
+  P.rooms=[r,k];P.cur=0;P.sel=null;
+  document.querySelectorAll('[data-c]').forEach(i=>i.value=P.client[i.dataset.c]);sync();draw();save();
+};
+$('#sv').onclick=()=>{const a=$d.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(P)],{type:'application/json'}));a.download=fname()+'.json';a.click()};
+$('#ld').onclick=()=>$('#fl').click();
+$('#fl').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const fr=new FileReader();
+  fr.onload=()=>{try{const j=JSON.parse(fr.result);if(j.projects){j.projects.forEach(p=>DB.projects.push(p));save();home();return}
+    if(!j.rooms||!j.rooms.length)throw 0;const q=Object.assign(mkProj(),j,{id:Date.now()+Math.random(),cur:0,sel:null});DB.projects.push(q);save();openProj(q.id)}catch(x){alert('Не удалось открыть файл проекта.')}};
+  fr.readAsText(f);
+};
+
+// ---------- рисование ----------
+const cv=$('#cv'),CW=1200,K=2,FONT='"Segoe UI",Arial';
+let G={};
+function render(cv,r,exp){
+  const b=bbox(r.pts),bw=Math.max(1,b.x1-b.x0),bh=Math.max(1,b.y1-b.y0),s=Math.min((CW-200)/bw,700/bh),pw=bw*s,ph=bh*s;
+  const rows=r.items.map((it,i)=>({n:i+1,t:desc(r,it)}));if(r.perim.on)rows.push({n:0,t:`Подсветка по периметру, ширина свечения ${r.perim.w} см`});
+  const nl=wrap(r.note,`15px ${FONT}`,1140),oy=190,H=oy+ph+80+(rows.length?rows.length*26+40:0)+(nl.length?nl.length*22+40:0);
+  G={s,ox:(CW-pw)/2,oy,x0:b.x0,y0:b.y0,H};
+  cv.width=CW*K;cv.height=H*K;
+  const c=cv.getContext('2d'),X=x=>G.ox+(x-b.x0)*s,Y=y=>oy+(y-b.y0)*s;
+  c.setTransform(K,0,0,K,0,0);c.fillStyle='#fff';c.fillRect(0,0,CW,H);
+  c.textBaseline='alphabetic';c.textAlign='left';c.fillStyle='#1d2733';c.font=`bold 26px ${FONT}`;
+  c.fillText(r.name||'Комната',30,40);
+  c.font=`15px ${FONT}`;c.fillStyle='#4a5560';
+  const cl=P.client,l1=[cl.n&&'Заказчик: '+cl.n,cl.p&&'тел. '+cl.p,cl.e].filter(Boolean).join(', '),l2=[cl.a&&'Адрес: '+cl.a,`площадь комнаты ${(area(r.pts)/10000).toFixed(1)} м²`].filter(Boolean).join(', ');
+  const mt=r.mat||{},ml=[mt.brand,mt.tex,mt.color,mt.harpoon==='black'?'черный теневой гарпун':mt.harpoon==='white'?'белый гарпун под ленту':''].filter(Boolean).join(', '),l3=P.di?'Монтаж: '+fd(P.di)+(P.t1?', '+P.t1+(P.t2?'–'+P.t2:''):''):'';
+  let hy=68;[[l1],[l2],[l3,1],[ml&&'Полотно: '+ml]].forEach(([t,b])=>{if(!t)return;c.font=b?`bold 17px ${FONT}`:`15px ${FONT}`;c.fillStyle=b?'#1d2733':'#4a5560';c.fillText(t,30,hy);hy+=24});
+  // комната
+  const path=()=>{c.beginPath();r.pts.forEach((p,i)=>i?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.closePath()};
+  path();c.fillStyle='#f7f9fb';c.fill();
+  if(P.grid&&!exp){c.save();path();c.clip();c.strokeStyle='#e3e8ee';c.lineWidth=1;c.beginPath();
+    for(let x=Math.ceil(b.x0/50)*50;x<b.x1;x+=50){c.moveTo(X(x),oy);c.lineTo(X(x),oy+ph)}
+    for(let y=Math.ceil(b.y0/50)*50;y<b.y1;y+=50){c.moveTo(ox0(),Y(y));c.lineTo(ox0()+pw,Y(y))}
+    c.stroke();c.restore()}
+  function ox0(){return G.ox}
+  if(r.perim.on){c.save();path();c.clip();c.lineJoin='round';c.strokeStyle=r.perim.col;
+    c.globalAlpha=.35;c.lineWidth=Math.max(8,2*r.perim.w*s);path();c.stroke();
+    c.globalAlpha=.95;c.lineWidth=Math.max(4,2*r.perim.w*s*.3);path();c.stroke();c.restore()}
+  path();c.strokeStyle='#1d2733';c.lineWidth=3;c.lineJoin='miter';c.stroke();
+  // размеры стен
+  r.pts.forEach((_,i)=>{
+    const w=wall(r,i),m=cp(w,w.l/2,0),tx=X(m[0])-w.n[0]*18,ty=Y(m[1])-w.n[1]*18;
+    c.fillStyle='#5b6672';c.font=`14px ${FONT}`;c.textAlign='center';c.textBaseline='middle';
+    c.fillText((exp?'':(i+1)+': ')+r0(w.l)+' см',tx,ty);
+  });
+  c.textBaseline='alphabetic';
+  const ord=['cornice','lamp','track','spot'];
+  [...r.items].sort((a,b)=>ord.indexOf(a.type)-ord.indexOf(b.type)).forEach(it=>item(c,r,it,X,Y,s));
+  r.items.forEach((it,i)=>badge(c,r,it,i+1,X,Y,s));
+  if(!exp){
+    const it=r.items.find(i=>i.id===P.sel);if(it)selMark(c,r,it,X,Y,s,b);
+    r.pts.forEach(p=>{c.fillStyle='#fff';c.strokeStyle='#0d6e6e';c.lineWidth=2;c.fillRect(X(p[0])-6,Y(p[1])-6,12,12);c.strokeRect(X(p[0])-6,Y(p[1])-6,12,12)});
+  }
+  if(rows.length){
+    let y=oy+ph+60;c.fillStyle='#1d2733';c.font=`bold 17px ${FONT}`;c.textAlign='left';c.fillText('Спецификация',30,y);
+    rows.forEach(rw=>{y+=26;
+      if(rw.n){c.fillStyle='#1a56db';c.beginPath();c.arc(40,y-5,10,0,7);c.fill();c.fillStyle='#fff';c.font=`bold 12px ${FONT}`;c.textAlign='center';c.fillText(rw.n,40,y-1)}
+      else{c.fillStyle=r.perim.col;c.fillRect(30,y-12,20,12);c.strokeStyle='#a87a00';c.lineWidth=1;c.strokeRect(30,y-12,20,12)}
+      c.fillStyle='#1d2733';c.font=`15px ${FONT}`;c.textAlign='left';c.fillText(rw.t,62,y)});
+  }
+  if(nl.length){let ny=oy+ph+60+(rows.length?rows.length*26+40:0);c.fillStyle='#1d2733';c.font=`bold 17px ${FONT}`;c.textAlign='left';c.fillText('Заметка',30,ny);c.font=`15px ${FONT}`;nl.forEach(t=>{ny+=22;c.fillText(t,30,ny)})}
+}
+const _sc=$d.createElement('canvas').getContext('2d');
+function wrap(t,font,w){if(!t)return[];_sc.font=font;const out=[];String(t).split('\n').forEach(p=>{let l='';p.split(' ').forEach(wd=>{const x=l?l+' '+wd:wd;if(_sc.measureText(x).width>w&&l){out.push(l);l=wd}else l=x});out.push(l)});return out}
+const draw=()=>render(cv,R());
+const GLOW='#ffc94d',EDGE='#a87a00';
+function item(c,r,it,X,Y,s){
+  const x=X(it.x),y=Y(it.y);
+  if(it.type==='cornice'){
+    const w=wall(r,it.wall),q=[cp(w,it.off,0),cp(w,it.off+it.len,0),cp(w,it.off+it.len,it.depth),cp(w,it.off,it.depth)];
+    c.beginPath();q.forEach((p,i)=>i?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.closePath();
+    c.fillStyle=it.old?'#ece5d6':'#d4dae1';c.fill();c.strokeStyle='#5b6672';c.lineWidth=1.5;c.setLineDash(it.old?[7,4]:[]);c.stroke();c.setLineDash([]);
+    c.save();c.clip();c.strokeStyle='#8d98a5';c.lineWidth=1;c.beginPath();
+    const n=Math.max(4,r0(it.len*s/12));
+    for(let i=0;i<=n;i++){const u=it.off+i*it.len/n,a=cp(w,u,0),b=cp(w,u+it.depth*.8,it.depth);c.moveTo(X(a[0]),Y(a[1]));c.lineTo(X(b[0]),Y(b[1]))}
+    c.stroke();c.restore();
+    if(it.light){const a=cp(w,it.off,it.depth),b=cp(w,it.off+it.len,it.depth);
+      c.lineCap='round';c.strokeStyle=GLOW;c.globalAlpha=.3;c.lineWidth=Math.max(10,12*s);c.beginPath();c.moveTo(X(a[0]),Y(a[1]));c.lineTo(X(b[0]),Y(b[1]));c.stroke();
+      c.globalAlpha=1;c.lineWidth=3;c.shadowColor=GLOW;c.shadowBlur=10;c.stroke();c.shadowBlur=0;c.lineCap='butt'}
+  }else if(it.type==='spot'){
+    const rr=Math.max(it.d/2*s,5);c.fillStyle='#ffe58a';c.strokeStyle=EDGE;c.lineWidth=2;
+    c.beginPath();c.arc(x,y,rr,0,7);c.fill();c.stroke();
+    c.beginPath();c.moveTo(x-rr*.5,y);c.lineTo(x+rr*.5,y);c.moveTo(x,y-rr*.5);c.lineTo(x,y+rr*.5);c.stroke();
+  }else if(it.type==='lamp'){
+    const rr=Math.max(it.d/2*s,10);c.fillStyle='rgba(255,229,138,.35)';c.strokeStyle=EDGE;c.lineWidth=2;c.setLineDash([8,5]);
+    c.beginPath();c.arc(x,y,rr,0,7);c.fill();c.stroke();c.setLineDash([]);
+    c.fillStyle='#ffe58a';c.beginPath();c.arc(x,y,rr*.3,0,7);c.fill();c.stroke();
+    c.beginPath();for(let a=0;a<8;a++){const t=a*Math.PI/4;c.moveTo(x+Math.cos(t)*rr*.4,y+Math.sin(t)*rr*.4);c.lineTo(x+Math.cos(t)*rr*.8,y+Math.sin(t)*rr*.8)}c.stroke();
+  }else if(it.type==='pipe'){
+    const rr=Math.max(it.d/2*s,5);c.setLineDash([4,3]);c.strokeStyle='#4a5560';c.lineWidth=1.5;c.beginPath();c.arc(x,y,rr*1.7,0,7);c.stroke();c.setLineDash([]);
+    c.fillStyle='#cfd6dd';c.lineWidth=2;c.beginPath();c.arc(x,y,rr,0,7);c.fill();c.stroke();
+  }else if(it.type==='vent'){
+    const q=Math.max(it.d*s,10);c.fillStyle='#e8eef3';c.strokeStyle='#4a5560';c.lineWidth=2;c.fillRect(x-q/2,y-q/2,q,q);c.strokeRect(x-q/2,y-q/2,q,q);
+    c.beginPath();c.moveTo(x-q/2,y-q/2);c.lineTo(x+q/2,y+q/2);c.moveTo(x+q/2,y-q/2);c.lineTo(x-q/2,y+q/2);c.stroke();
+  }else{
+    const L=it.len*s,w=Math.max(6,4*s);c.save();c.translate(x,y);c.rotate(+it.rot?Math.PI/2:0);
+    c.fillStyle='#2b333d';c.fillRect(-L/2,-w/2,L,w);c.fillStyle='#ffe58a';c.strokeStyle=EDGE;c.lineWidth=1.5;
+    const n=Math.max(2,r0(it.len/40));
+    for(let i=0;i<n;i++){c.beginPath();c.arc(-L/2+(i+.5)*L/n,0,Math.max(5,w*.9),0,7);c.fill();c.stroke()}
+    c.restore();
+  }
+}
+function badge(c,r,it,n,X,Y,s){
+  let x,y;
+  if(it.type==='cornice'){const p=cp(wall(r,it.wall),it.off+it.len/2,it.depth/2);x=X(p[0]);y=Y(p[1])}
+  else{x=X(it.x);y=Y(it.y);
+    const o=it.type==='spot'?Math.max(it.d/2*s,5)+10:it.type==='lamp'?Math.max(it.d/2*s,10)+12:12;
+    if(it.type==='track'){if(+it.rot)x+=o+2;else y-=o+6}else{x+=o*.7;y-=o*.7}}
+  c.fillStyle='#1a56db';c.beginPath();c.arc(x,y,10,0,7);c.fill();
+  c.fillStyle='#fff';c.font=`bold 12px ${FONT}`;c.textAlign='center';c.textBaseline='middle';c.fillText(n,x,y+.5);c.textBaseline='alphabetic';
+}
+function selMark(c,r,it,X,Y,s,b){
+  c.strokeStyle=c.fillStyle='#e11d48';c.lineWidth=1.5;
+  if(it.type==='cornice'){const w=wall(r,it.wall),q=[cp(w,it.off,0),cp(w,it.off+it.len,0),cp(w,it.off+it.len,it.depth),cp(w,it.off,it.depth)];
+    c.setLineDash([6,4]);c.beginPath();q.forEach((p,i)=>i?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.closePath();c.stroke();c.setLineDash([]);return}
+  const x=X(it.x),y=Y(it.y),lx=X(b.x0),ty=Y(b.y0);
+  c.setLineDash([5,4]);c.beginPath();c.moveTo(lx,y);c.lineTo(x,y);c.moveTo(x,ty);c.lineTo(x,y);c.stroke();c.setLineDash([]);
+  c.font=`bold 14px ${FONT}`;
+  c.save();c.fillStyle='rgba(255,255,255,.9)';c.fillRect((lx+x)/2-28,y-22,56,18);c.fillRect(x+4,(ty+y)/2-9,56,18);c.restore();
+  c.textAlign='center';c.fillText(r0(it.x-b.x0)+' см',(lx+x)/2,y-8);c.textAlign='left';c.fillText(r0(it.y-b.y0)+' см',x+8,(ty+y)/2+5);
+}
+
+// ---------- перетаскивание ----------
+let drag=null;
+function pt(e){
+  const bb=cv.getBoundingClientRect(),k=CW/bb.width,px=(e.clientX-bb.left)*k,py=(e.clientY-bb.top)*k;
+  return{X:px,Y:py,x:(px-G.ox)/G.s+G.x0,y:(py-G.oy)/G.s+G.y0};
+}
+function hit(r,it,p){
+  const tol=12/G.s;
+  if(it.type==='cornice'){const w=wall(r,it.wall),dx=p.x-w.a[0],dy=p.y-w.a[1],u=dx*w.d[0]+dy*w.d[1],v=dx*w.n[0]+dy*w.n[1];
+    return u>=it.off-tol/2&&u<=it.off+it.len+tol/2&&v>=-tol/2&&v<=it.depth+tol/2}
+  const dx=Math.abs(p.x-it.x),dy=Math.abs(p.y-it.y);
+  if(it.type==='track'){const a=+it.rot?dy:dx,b=+it.rot?dx:dy;return a<=it.len/2&&b<=Math.max(5,tol)}
+  return Math.hypot(dx,dy)<=Math.max(it.d/2,tol);
+}
+cv.addEventListener('pointerdown',e=>{
+  const r=R(),p=pt(e);let v=-1;
+  r.pts.forEach((q,i)=>{if(Math.hypot((q[0]-G.x0)*G.s+G.ox-p.X,(q[1]-G.y0)*G.s+G.oy-p.Y)<=12)v=i});
+  if(v>=0){drag={v};cv.setPointerCapture(e.pointerId);return}
+  let f=null;for(let i=r.items.length-1;i>=0;i--)if(hit(r,r.items[i],p)){f=r.items[i];break}
+  P.sel=f?f.id:null;
+  if(f){drag={it:f,dx:f.x-p.x,dy:f.y-p.y};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing'}
+  list();draw();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;const r=R(),p=pt(e),b=bbox(r.pts);
+  if(drag.v!==undefined){r.pts[drag.v]=[r0(p.x),r0(p.y)];$('#pts').value=r.pts.map(q=>q.join(', ')).join('\n')}
+  else{const it=drag.it;
+    if(it.type==='cornice'){const w=wall(r,it.wall),u=(p.x-w.a[0])*w.d[0]+(p.y-w.a[1])*w.d[1];it.off=r0(Math.max(0,Math.min(w.l-it.len,u-it.len/2)))}
+    else{it.x=r0(Math.max(b.x0,Math.min(b.x1,p.x+drag.dx)));it.y=r0(Math.max(b.y0,Math.min(b.y1,p.y+drag.dy)))}
+    $d.querySelectorAll('#list [data-k]').forEach(i=>{if(it[i.dataset.k]!==undefined&&i.type!=='checkbox')i.value=it[i.dataset.k]})}
+  draw();
+});
+const end=()=>{if(drag){const v=drag.v!==undefined;drag=null;cv.style.cursor='grab';if(v)list();save()}};
+cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+
+// ---------- экспорт ----------
+const fname=()=>(P.client.n||R().name||'potolok').replace(/[^\wА-Яа-яЁё-]+/g,'_');
+$('#jpg').onclick=()=>{const t=$d.createElement('canvas');render(t,R(),true);const a=$d.createElement('a');a.href=t.toDataURL('image/jpeg',.93);a.download=fname()+'_'+(R().name||'komnata').replace(/[^\wА-Яа-яЁё-]+/g,'_')+'.jpg';a.click();draw()};
+$('#pdf').onclick=()=>{
+  if(!window.jspdf){alert('Не загрузилась библиотека PDF. Проверьте интернет или скачайте JPEG.');return}
+  let pdf;
+  [...P.rooms,0].forEach((r,i)=>{
+    const t=$d.createElement('canvas');if(r)render(t,r,true);else renderSpec(t);const w=t.width,h=t.height,o=h>w?'p':'l';
+    if(i)pdf.addPage('a4',o);else pdf=new window.jspdf.jsPDF({orientation:o,unit:'mm',format:'a4'});
+    const pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),k=Math.min((pw-16)/w,(ph-16)/h);
+    pdf.addImage(t.toDataURL('image/jpeg',.93),'JPEG',(pw-w*k)/2,8,w*k,h*k);
+  });
+  pdf.save(fname()+'.pdf');draw();
+};
+// ---------- проекты ----------
+const fd=d=>d?d.split('-').reverse().join('.'):'не назначен';
+function home(){
+  $('#proj').hidden=true;$('#home').hidden=false;
+  const ps=[...DB.projects].sort((a,b)=>(b.dm||'').localeCompare(a.dm||''));
+  $('#plist').innerHTML=ps.length?ps.map(p=>{const A=p.rooms.reduce((s,r)=>s+area(r.pts)/10000,0);
+    return `<div class="card pc"><div><b>${esc(p.name)}</b> <span class="tag">${esc(p.status||'')}</span><br><span class="mut">${esc(p.client.n||'заказчик не указан')}${p.client.a?', '+esc(p.client.a):''}</span><br>Замер: ${fd(p.dm)}, монтаж: ${fd(p.di)}, ${p.rooms.length} комн., ${A.toFixed(1)} м²</div><div class="pb"><button class="pri" data-po="${p.id}">Открыть</button><button data-pd="${p.id}">Копия</button><button data-px="${p.id}">Удалить</button></div></div>`}).join(''):'<p class="hint">Проектов пока нет. Нажмите «Новый проект».</p>';
+  $('#pk').value=DB.key||'';
+}
+function openProj(id){
+  P=DB.projects.find(p=>p.id==id);P.cur=0;P.sel=null;P.extras=P.extras||[];
+  $('#home').hidden=true;$('#proj').hidden=false;
+  $d.querySelectorAll('[data-c]').forEach(i=>i.value=P.client[i.dataset.c]||'');
+  $('#pn').value=P.name;$('#dm').value=P.dm||'';$('#di').value=P.di||'';$('#t1').value=P.t1||'';$('#t2').value=P.t2||'';$('#pnote').value=P.note||'';$('#st').value=P.status||'Замер';$('#phs').textContent='Загрузите фото чертежа или эскиза замера: комнаты, размеры и элементы заполнятся сами.';
+  sync();draw();specUI();window.scrollTo(0,0);
+}
+$('#plist').onclick=e=>{
+  const o=e.target.closest('[data-po]'),d=e.target.closest('[data-pd]'),x=e.target.closest('[data-px]');
+  if(o)openProj(o.dataset.po);
+  else if(d){const p=DB.projects.find(p=>p.id==d.dataset.pd),c=JSON.parse(JSON.stringify(p));c.id=Date.now()+Math.random();c.name+=' (копия)';DB.projects.push(c);save();home()}
+  else if(x){const p=DB.projects.find(p=>p.id==x.dataset.px);if(confirm('Удалить проект «'+p.name+'»?')){DB.projects=DB.projects.filter(q=>q!==p);save();home()}}
+};
+$('#pnew').onclick=()=>{const p=mkProj();DB.projects.push(p);save();openProj(p.id)};
+$('#pld').onclick=()=>$('#fl').click();
+$('#pbk').onclick=()=>{const a=$d.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({projects:DB.projects})],{type:'application/json'}));a.download='potolki_backup_'+today()+'.json';a.click()};
+$('#pk').oninput=e=>{DB.key=e.target.value.trim();persist()};
+$('#back').onclick=home;
+$('#pn').oninput=e=>{P.name=e.target.value;persist()};
+$('#dm').oninput=e=>{P.dm=e.target.value;persist()};
+$('#di').oninput=e=>{P.di=e.target.value;persist()};
+$('#st').oninput=e=>{P.status=e.target.value;persist()};
+
+// ---------- список оборудования ----------
+const XP=[['Управление светом (контроллер, диммер, пульт)','шт.'],['Блок питания для LED','шт.'],['Другое','шт.']];
+const kl=k=>k?k+' K ('+(k<=3200?'тёплый':k<=4500?'белый':'холодный')+')':'';
+const wt=w=>w?w+' Вт':'';
+function specRows(p){
+  const o=[],a=(k,name,u,q)=>{if(q>0)o.push({k,name,u,q:r0(q*100)/100,pr:DB.prices[k]||0})};
+  const mats={},sp={},tr={};let per=0,pl=0,lamp=0,cor=0,cl=0,old=0,vent=0,pipe=0;
+  p.rooms.forEach(r=>{
+    const m=r.mat||{},lb=[m.brand,m.tex,m.color,m.harpoon==='black'?'черный теневой гарпун':m.harpoon==='white'?'белый гарпун под ленту':''].filter(Boolean).join(', ');mats[lb]=(mats[lb]||0)+area(r.pts)/10000;
+    const L=r.pts.reduce((t,_,i)=>t+wall(r,i).l,0)/100;per+=L;if(r.perim.on)pl+=L;
+    r.items.forEach(it=>{
+      if(it.type==='spot'){const k=[it.d,it.w||0,it.k||0].join('|');sp[k]=(sp[k]||0)+1}
+      else if(it.type==='track'){const k=[it.w||0,it.k||0].join('|');tr[k]=(tr[k]||0)+it.len/100}
+      else if(it.type==='lamp')lamp++;
+      else if(it.type==='cornice'){if(it.old)old++;else{cor+=it.len/100;if(it.light)cl+=it.len/100}}
+      else if(it.type==='vent')vent++;
+      else if(it.type==='pipe')pipe++})});
+  Object.keys(mats).forEach(lb=>a('area|'+lb,'Натяжной потолок'+(lb?', '+lb:''),'м²',mats[lb]));
+  a('prof','Профиль по периметру','м.п.',per);
+  Object.keys(sp).forEach(k=>{const[d,w,t]=k.split('|');a('spot'+k,['Точечный светильник Ø'+d+' см',wt(+w),kl(+t)].filter(Boolean).join(', '),'шт.',sp[k])});
+  Object.keys(tr).forEach(k=>{const[w,t]=k.split('|');a('track'+k,['Трековая система',wt(+w),kl(+t)].filter(Boolean).join(', '),'м.п.',tr[k])});
+  a('lamp','Люстра (установка)','шт.',lamp);a('cornice','Карниз','м.п.',cor);
+  a('recorn','Перевеска существующего карниза ниже','шт.',old);
+  a('lper','Подсветка по периметру (LED)','м.п.',pl);a('lcor','Подсветка в карнизе (LED)','м.п.',cl);
+  a('vent','Вентиляция (решётка, диффузор)','шт.',vent);a('pipe','Обход труб','шт.',pipe);
+  (p.extras||[]).forEach((x,i)=>o.push({x:i,name:x.name,u:x.u,q:x.q,pr:x.pr}));
+  return o;
+}
+function specUI(){
+  const rows=specRows(P);
+  let h='<table><tr><th>Позиция</th><th>Ед.</th><th>Кол-во</th><th>Цена, €</th><th>Сумма, €</th><th></th></tr>';
+  rows.forEach(r=>{h+=r.x!==undefined
+    ?`<tr data-x="${r.x}"><td><input data-xf="name" value="${esc(r.name)}"></td><td><input data-xf="u" value="${esc(r.u)}" style="width:60px"></td><td><input data-xf="q" type="number" value="${r.q}" style="width:80px"></td><td><input data-xf="pr" type="number" step="0.01" value="${r.pr||''}" style="width:90px"></td><td data-sum></td><td><button data-xd="${r.x}">✕</button></td></tr>`
+    :`<tr><td>${esc(r.name)}</td><td>${r.u}</td><td>${r.q}</td><td><input data-pk="${esc(r.k)}" type="number" step="0.01" value="${r.pr||''}" style="width:90px"></td><td data-sum></td><td></td></tr>`});
+  h+='<tr><td colspan="4"><b>Итого без НДС</b></td><td id="tot"></td><td></td></tr></table><div class="tabs" style="margin-top:8px">'+XP.map((x,i)=>`<button data-xa="${i}">+ ${esc(x[0].split(' (')[0])}</button>`).join('')+'</div>';
+  $('#spec').innerHTML=h;totals();
+}
+function totals(){
+  const rows=specRows(P);let t=0;
+  $d.querySelectorAll('#spec [data-sum]').forEach((td,i)=>{const s=rows[i].q*rows[i].pr;t+=s;td.textContent=s?s.toFixed(2):''});
+  $('#tot').textContent=t.toFixed(2);
+}
+$('#spec').addEventListener('input',e=>{
+  const t=e.target,tr=t.closest('tr');
+  if(t.dataset.pk)DB.prices[t.dataset.pk]=parseFloat(t.value)||0;
+  else if(t.dataset.xf){const x=P.extras[+tr.dataset.x],f=t.dataset.xf;x[f]=(f==='name'||f==='u')?t.value:(parseFloat(t.value)||0)}
+  else return;
+  persist();totals();
+});
+$('#spec').addEventListener('click',e=>{
+  const a=e.target.closest('[data-xa]'),d=e.target.closest('[data-xd]');
+  if(a){const x=XP[+a.dataset.xa];P.extras.push({name:x[0],u:x[1],q:1,pr:0})}
+  else if(d)P.extras.splice(+d.dataset.xd,1);else return;
+  save();
+});
+function renderSpec(cv){
+  const rows=specRows(P),hp=rows.some(r=>r.pr>0),cl=P.client,nl=wrap(P.note,`15px ${FONT}`,1140),H=215+rows.length*32+70+(nl.length?nl.length*22+50:0);
+  cv.width=CW*K;cv.height=H*K;const c=cv.getContext('2d');c.setTransform(K,0,0,K,0,0);
+  c.fillStyle='#fff';c.fillRect(0,0,CW,H);c.fillStyle='#1d2733';c.font=`bold 26px ${FONT}`;c.textAlign='left';
+  c.fillText('Список оборудования и материалов',30,40);
+  c.font=`15px ${FONT}`;c.fillStyle='#4a5560';
+  c.fillText([P.name,cl.n&&'заказчик '+cl.n,cl.p,cl.e].filter(Boolean).join(', '),30,68);
+  c.fillText([cl.a&&'Адрес: '+cl.a,P.dm&&'замер '+fd(P.dm)].filter(Boolean).join(', '),30,92);
+  if(P.di){c.font=`bold 17px ${FONT}`;c.fillStyle='#1d2733';c.fillText('Монтаж: '+fd(P.di)+(P.t1?', '+P.t1+(P.t2?'–'+P.t2:''):''),30,118);c.font=`15px ${FONT}`;c.fillStyle='#4a5560'}
+  let y=165;c.font=`bold 15px ${FONT}`;c.fillStyle='#1d2733';
+  const col=(t,x,al)=>{c.textAlign=al||'left';c.fillText(t,x,y)};
+  col('Позиция',30);col('Ед.',780);col('Кол-во',920,'right');if(hp){col('Цена, €',1040,'right');col('Сумма, €',1170,'right')}
+  c.strokeStyle='#d5dbe2';c.beginPath();c.moveTo(30,y+8);c.lineTo(1170,y+8);c.stroke();
+  c.font=`16px ${FONT}`;let tot=0;
+  rows.forEach(r=>{y+=32;col(r.name,30);col(r.u,780);col(String(r.q),920,'right');
+    if(hp){const s=r.q*r.pr;tot+=s;if(r.pr){col(r.pr.toFixed(2),1040,'right');col(s.toFixed(2),1170,'right')}}});
+  if(hp){y+=40;c.font=`bold 17px ${FONT}`;col('Итого без НДС',30);col(tot.toFixed(2),1170,'right')}
+  if(nl.length){y+=50;c.font=`bold 17px ${FONT}`;col('Заметка',30);c.font=`15px ${FONT}`;nl.forEach(t=>{y+=22;col(t,30)})}
+}
+$('#xl').onclick=()=>{
+  if(!window.XLSX){alert('Не загрузилась библиотека Excel. Проверьте интернет.');return}
+  const rows=specRows(P),c=P.client;
+  const a=[['Проект',P.name],['Заказчик',c.n],['Телефон',c.p],['E-mail',c.e],['Адрес объекта',c.a],['Замер',fd(P.dm)],['Монтаж',fd(P.di)+(P.t1?' '+P.t1+(P.t2?'–'+P.t2:''):'')],[],['Позиция','Ед.','Кол-во','Цена, €','Сумма, €']];
+  rows.forEach(r=>a.push([r.name,r.u,r.q,r.pr||'',r.pr?r0(r.q*r.pr*100)/100:'']));
+  a.push([],['Итого без НДС','','','',r0(rows.reduce((t,r)=>t+r.q*r.pr,0)*100)/100]);
+  if(P.note)a.push([],['Заметка',P.note]);
+  const b=[['Комната','Площадь, м²','Периметр, м','Углов','Элементов','Полотно','Заметка']];
+  P.rooms.forEach(r=>b.push([r.name,+(area(r.pts)/10000).toFixed(2),+(r.pts.reduce((t,_,i)=>t+wall(r,i).l,0)/100).toFixed(2),r.pts.length,r.items.length,((r.mat&&[r.mat.brand,r.mat.tex,r.mat.color,r.mat.harpoon==='black'?'черный теневой гарпун':r.mat.harpoon==='white'?'белый гарпун под ленту':''].filter(Boolean).join(', '))||''),r.note||'']));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),'Список');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(b),'Комнаты');
+  XLSX.writeFile(wb,fname()+'.xlsx');
+};
+
+// ---------- распознавание по фото ----------
+const PROMPT=`Это фото рукописной записи замера, чертежа или эскиза потолка. Сегодня ${today()}. Определи данные объекта, комнаты, их форму и размеры и все элементы потолка. Ответь ТОЛЬКО JSON без пояснений в формате:
+{"project":{"address":"","phone":"","install_date":"YYYY-MM-DD","time_from":"HH:MM","time_to":"HH:MM","measure_date":"","note":""},"rooms":[{"name":"Гостиная","pts":[[0,0],[400,0],[400,500],[0,500]],"perim":false,"brand":"MSD","texture":"матовая","color":"белый","harpoon":"","note":"","items":[{"type":"spot","x":100,"y":100,"d":8,"w":6,"k":4000}]}]}
+Правила: размеры в сантиметрах. pts: углы комнаты по обходу, первый угол (0,0), без лишних точек. Если размеры подписаны, используй их, иначе оцени по пропорциям. Если год в дате не указан, бери ближайшую дату в будущем или текущий год. Неизвестные поля оставляй пустыми. brand: MSD, Bauf или Tectum. texture: матовая, сатиновая или глянцевая. harpoon: black (черный теневой) или white (белый под ленту). perim true, если есть подсветка по периметру. Типы items: spot (точечный светильник: d, w мощность в Вт, k температура в Кельвинах), lamp (люстра, d), track (трек: len, rot 0 или 90, w, k), cornice (карниз: wall номер стены с 0, стена 0 идёт от pts[0] к pts[1]; off отступ от начала стены; len; depth по умолчанию 12; light true, если в карнизе подсветка; old true, если карниз уже существует и его нужно перевесить), vent (вентиляция, d), pipe (обход трубы, d). x, y это координаты центра. Всё остальное, что важно, но не вошло в поля (цена, группы света, пожелания), коротко запиши в project.note.`;
+function shrink(f){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),t=$d.createElement('canvas');t.width=im.width*k;t.height=im.height*k;t.getContext('2d').drawImage(im,0,0,t.width,t.height);ok(t.toDataURL('image/jpeg',.85).split(',')[1])};im.onerror=()=>no(new Error('не удалось прочитать фото'));im.src=URL.createObjectURL(f)})}
+function applyPhoto(d){
+  const num=(v,def)=>(v!==null&&v!==''&&isFinite(+v))?+v:def;
+  const rs=(d.rooms||[]).map((q,i)=>{
+    const r=mkRoom(q.name||'Комната '+(i+1)),pts=(q.pts||[]).map(p=>[r0(num(p[0],0)),r0(num(p[1],0))]);
+    if(pts.length<3)return null;r.pts=pts;r.perim.on=!!q.perim;r.mat={brand:q.brand||'',tex:q.texture||'',color:q.color||'',harpoon:q.harpoon||''};r.note=q.note||'';
+    (q.items||[]).forEach(it=>{if(!NAMES[it.type])return;
+      const o={id:Date.now()+Math.random(),type:it.type,x:r0(num(it.x,0)),y:r0(num(it.y,0))};
+      if(o.type==='spot'){o.d=num(it.d,8);o.w=num(it.w,6);o.k=num(it.k,4000)}if(o.type==='pipe')o.d=num(it.d,5);if(o.type==='lamp')o.d=num(it.d,60);if(o.type==='vent')o.d=num(it.d,10);
+      if(o.type==='track'){o.len=num(it.len,150);o.rot=+it.rot?90:0;o.w=num(it.w,12);o.k=num(it.k,4000)}
+      if(o.type==='cornice'){const n=pts.length;o.wall=((r0(num(it.wall,0))%n)+n)%n;o.off=num(it.off,0);o.len=num(it.len,200);o.depth=num(it.depth,12);o.light=!!it.light;o.old=!!it.old}
+      r.items.push(o)});
+    return r}).filter(Boolean);
+  if(!rs.length)throw new Error('на фото не найдено комнат');
+  const pj=d.project||{},dt=/^\d{4}-\d\d-\d\d$/,tm=/^\d\d:\d\d$/;
+  if(pj.address)P.client.a=pj.address;if(pj.phone)P.client.p=pj.phone;
+  if(dt.test(pj.install_date||''))P.di=pj.install_date;if(dt.test(pj.measure_date||''))P.dm=pj.measure_date;
+  if(tm.test(pj.time_from||''))P.t1=pj.time_from;if(tm.test(pj.time_to||''))P.t2=pj.time_to;
+  if(pj.note)P.note=(P.note?P.note+'\n':'')+pj.note;
+  if(P.rooms.length===1&&!P.rooms[0].items.length)P.rooms=rs;else P.rooms.push(...rs);
+  save();openProj(P.id);
+}
+$('#ph').onclick=()=>{if(!DB.key){alert('Сначала вставьте API-ключ Anthropic: «Все проекты» → «Настройки».');return}$('#pf').click()};
+$('#pf').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;const st=$('#phs');st.textContent='Распознаю фото, это займёт около полминуты…';
+  try{
+    const b64=await shrink(f);
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'content-type':'application/json','x-api-key':DB.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:PROMPT}]}]})});
+    const j=await res.json();if(!res.ok)throw new Error((j.error&&j.error.message)||res.status);
+    applyPhoto(JSON.parse(j.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim()));
+    st.textContent='Готово. Это оценка по фото: проверьте размеры и поправьте при необходимости.';
+  }catch(err){st.textContent='Не получилось: '+err.message}
+};
+$('#t1').oninput=e=>{P.t1=e.target.value;persist()};
+$('#t2').oninput=e=>{P.t2=e.target.value;persist()};
+$('#pnote').oninput=e=>{P.note=e.target.value;persist()};
+['mb','mt','mc','mh','rnote'].forEach(id=>$('#'+id).oninput=()=>{const r=R();r.mat={brand:$('#mb').value,tex:$('#mt').value,color:$('#mc').value,harpoon:$('#mh').value};r.note=$('#rnote').value;draw();save()});
+home();
+</script>
+</body>
+</html>
